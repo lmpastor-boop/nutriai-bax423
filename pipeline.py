@@ -832,7 +832,7 @@ class NutriAIPipeline:
         )]
 
         # Block uncooked grains and cookies at pool level
-        _block_desc = r"quinoa.*uncooked|quinoa, uncooked|rice.*uncooked|rice.*glutinous.*unenriched|rice.*precooked.*instant|cookie|sandwich cookie|lemon wafer|peanuts,|herring eggs|herring.*eggs|potatoes.*skin.*with salt|skin only.*with salt|sprouted, cooked|sprouted,.*cooked|smoked and canned.*alaska native|chinook.*smoked.*canned"
+        _block_desc = r"quinoa.*uncooked|quinoa, uncooked|rice.*uncooked|rice.*glutinous.*unenriched|rice.*precooked.*instant|cookie|sandwich cookie|lemon wafer|peanuts,|herring eggs|herring.*eggs|potatoes.*skin.*with salt|skin only.*with salt|sprouted, cooked|sprouted,.*cooked|smoked and canned.*alaska native|chinook.*smoked.*canned|separable fat|subcutaneous fat|intermuscular fat|cured.*separable fat|external fat only|separable fat.*raw|fat.*raw.*alaska|smoked.*brined|giblets.*raw|pork.*tail|variety meats.*tail"
         df = df[~df["description"].fillna("").str.lower().str.contains(_block_desc, regex=True, na=False)]
 
         # No-pork filter applied at pool level (catches fallback path too)
@@ -1647,6 +1647,43 @@ class NutriAIPipeline:
                         # Re-run analysis from this day forward
                         analysis = self.analyse(plan)
                         break
+
+        # General sodium soft cap — applies to ALL profiles (not just hypertension)
+        # Replaces worst offender slot on any day exceeding 2500mg
+        _na_limit = 1500 if "hypertension" in profile.conditions else 2500
+        _analysis_na = self.analyse(plan)
+        for _day in range(1, 8):
+            _day_na = _analysis_na["days"][_day]["totals"].get("sodium_mg", 0)
+            if _day_na <= _na_limit:
+                continue
+            # Find highest-sodium slot
+            _day_slots = [s for s in plan.slots if s.day == _day]
+            _worst = max(_day_slots, key=lambda s: s.scaled("sodium_mg"))
+            # Find a lower-sodium replacement from safe_pool
+            for _, _row in safe_pool.iterrows():
+                _desc = _row.get("description", "") or ""
+                if _desc in {s.name for s in plan.slots}:
+                    continue
+                _eligible, _ = self._is_meal_eligible(_row)
+                if not _eligible:
+                    continue
+                _ok, _ = self._passes_clinical(_row, profile)
+                if not _ok:
+                    continue
+                _na = (_row.get("sodium_mg") or 0)
+                if _na > 300:  # skip high-sodium replacements
+                    continue
+                _cals = _row.get("calories") or 100
+                _target = _worst.scaled("calories")
+                _srv = min(400, max(80, (_target / _cals) * 100))
+                _worst.name = _desc
+                _worst.fdc_id = int(_row["fdc_id"])
+                _worst.category = _row.get("food_category", "") or ""
+                _worst.nutrients = {k: _row.get(k) for k in profile.rda().keys()
+                                    if k in _row.index}
+                _worst.serving_g = round(_srv, 1)
+                _analysis_na = self.analyse(plan)
+                break
 
         # Fibre guarantee for diabetes profiles (rubric: ≥25g/day all 7 days)
         if "diabetes" in profile.conditions:
