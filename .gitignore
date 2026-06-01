@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+data/tfidf.pkl
+scorecard.py
+fix_potassium.py
