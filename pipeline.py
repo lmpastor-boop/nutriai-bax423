@@ -206,6 +206,7 @@ RAW_MEAT_KEYWORDS = [
     "beef,.*raw", "pork,.*raw", "lamb,.*raw", "veal,.*raw",
     "chicken,.*raw", "turkey,.*raw", "duck,.*raw", "game meat,.*raw",
     "fish,.*raw.*alaska native", "meat,.*raw.*alaska native",
+    "fish,.*,.*raw", "fish,.*, raw",
     "mechanically separated", "whitefish.*eggs.*alaska",
     "external fat.*raw", "variety meats.*raw",
 ]
@@ -850,7 +851,7 @@ class NutriAIPipeline:
             )]
 
         # Block uncooked grains and cookies at pool level
-        _block_desc = r"quinoa.*uncooked|quinoa, uncooked|rice.*uncooked|rice.*glutinous.*unenriched|rice.*precooked.*instant|cookie|sandwich cookie|lemon wafer|peanuts,|herring eggs|herring.*eggs|potatoes.*skin.*with salt|skin only.*with salt|sprouted, cooked|sprouted,.*cooked|smoked and canned.*alaska native|chinook.*smoked.*canned|separable fat|subcutaneous fat|intermuscular fat|cured.*separable fat|external fat only|separable fat.*raw|fat.*raw.*alaska|smoked.*brined|giblets.*raw|pork.*tail|variety meats.*tail|variety meats.*feet|variety meats.*ear|variety meats.*snout|variety meats.*chitterling|variety meats.*intestine|variety meats.*tripe|egg.*substitute.*powder|egg, yolk.*raw|yolk.*raw.*fresh|giblets.*fried|giblets.*cooked|chicken.*skin.*added sol|chicken.*skin.*drumstick|smoked.*canned.*alaska native"
+        _block_desc = r"quinoa.*uncooked|quinoa, uncooked|rice.*uncooked|rice.*glutinous.*unenriched|rice.*precooked.*instant|cookie|sandwich cookie|lemon wafer|peanuts,|herring eggs|herring.*eggs|potatoes.*skin.*with salt|skin only.*with salt|sprouted, cooked|sprouted,.*cooked|smoked and canned.*alaska native|chinook.*smoked.*canned|separable fat|subcutaneous fat|intermuscular fat|cured.*separable fat|external fat only|separable fat.*raw|fat.*raw.*alaska|smoked.*brined|giblets.*raw|pork.*tail|variety meats.*tail|variety meats.*feet|variety meats.*ear|variety meats.*snout|variety meats.*chitterling|variety meats.*intestine|variety meats.*tripe|variety meats.*brain|variety meats.*lung|variety meats.*spleen|variety meats.*pancreas|variety meats.*liver|head.*eyes.*cheeks|broad.*head|egg.*goose.*raw|egg.*duck.*raw|egg.*turkey.*raw|egg.*quail.*raw|egg.*substitute.*powder|egg, yolk.*raw|yolk.*raw.*fresh|giblets.*fried|giblets.*cooked|chicken.*skin.*added sol|chicken.*skin.*drumstick|smoked.*canned.*alaska native"
         df = df[~df["description"].fillna("").str.lower().str.contains(_block_desc, regex=True, na=False)]
 
         # No-pork filter applied at pool level (catches fallback path too)
