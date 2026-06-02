@@ -333,6 +333,31 @@ def sidebar_profile() -> UserProfile:
     )
 
     st.sidebar.markdown("---")
+    st.sidebar.markdown("## 🥩 Food Preferences")
+    PROTEIN_EXCLUSIONS = {
+        "lamb":     ["lamb"],
+        "veal":     ["veal"],
+        "pork":     ["pork", "bacon", "ham"],
+        "beef":     ["beef"],
+        "turkey":   ["turkey"],
+        "chicken":  ["chicken"],
+        "fish":     ["fish", "salmon", "tuna", "cod", "tilapia", "halibut",
+                     "trout", "sardine", "mackerel", "herring"],
+        "shellfish":["shrimp", "crab", "lobster", "clam", "oyster", "scallop"],
+        "eggs":     ["egg,", "eggs,"],
+        "game meat":["game meat", "elk", "venison", "bison", "rabbit"],
+    }
+    excluded_proteins = st.sidebar.multiselect(
+        "Exclude specific proteins (optional)",
+        options=list(PROTEIN_EXCLUSIONS.keys()),
+        default=[],
+        format_func=lambda x: x.title()
+    )
+    # Flatten selected exclusion keywords
+    extra_exclusions = []
+    for p in excluded_proteins:
+        extra_exclusions.extend(PROTEIN_EXCLUSIONS[p])
+
     st.sidebar.markdown("## 🏥 Clinical Conditions")
 
     condition_options = list(CONDITION_LABELS.keys())
@@ -348,7 +373,7 @@ def sidebar_profile() -> UserProfile:
         weight_kg=weight, height_cm=height,
         calorie_target=float(calorie_target),
         diet_type=diet_type,
-        allergens=allergens,
+        allergens=allergens + extra_exclusions,
         conditions=conditions,
         no_pork=no_pork,
     )
