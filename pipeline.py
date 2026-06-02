@@ -197,6 +197,17 @@ INELIGIBLE_FOOD_KEYWORDS = [
     "oil, ", " oil", "shortening", "lard", "tallow", "margarine",
     "cooking spray", "vinegar", "salt, ", "baking powder", "baking soda",
     "food starch", "gelatin, dry", "yeast, ",
+    # Raw meat/fish/poultry — not safe or realistic as served meals
+    # Exceptions: raw produce, raw eggs (allowed), raw fish for pescatarian (handled separately)
+]
+
+# Raw animal protein keywords — blocked at pool level for all profiles
+RAW_MEAT_KEYWORDS = [
+    "beef,.*raw", "pork,.*raw", "lamb,.*raw", "veal,.*raw",
+    "chicken,.*raw", "turkey,.*raw", "duck,.*raw", "game meat,.*raw",
+    "fish,.*raw.*alaska native", "meat,.*raw.*alaska native",
+    "mechanically separated", "whitefish.*eggs.*alaska",
+    "external fat.*raw", "variety meats.*raw",
 ]
 
 # Restaurant / fast-food chains — prepared meals with unknown/non-vegan ingredients
@@ -831,8 +842,15 @@ class NutriAIPipeline:
             uncooked_grain_pat, regex=True, na=False
         )]
 
+        # Block raw meat/fish at pool level
+        import re as _re2
+        for _raw_pat in RAW_MEAT_KEYWORDS:
+            df = df[~df["description"].fillna("").str.lower().str.contains(
+                _raw_pat, regex=True, na=False
+            )]
+
         # Block uncooked grains and cookies at pool level
-        _block_desc = r"quinoa.*uncooked|quinoa, uncooked|rice.*uncooked|rice.*glutinous.*unenriched|rice.*precooked.*instant|cookie|sandwich cookie|lemon wafer|peanuts,|herring eggs|herring.*eggs|potatoes.*skin.*with salt|skin only.*with salt|sprouted, cooked|sprouted,.*cooked|smoked and canned.*alaska native|chinook.*smoked.*canned|separable fat|subcutaneous fat|intermuscular fat|cured.*separable fat|external fat only|separable fat.*raw|fat.*raw.*alaska|smoked.*brined|giblets.*raw|pork.*tail|variety meats.*tail"
+        _block_desc = r"quinoa.*uncooked|quinoa, uncooked|rice.*uncooked|rice.*glutinous.*unenriched|rice.*precooked.*instant|cookie|sandwich cookie|lemon wafer|peanuts,|herring eggs|herring.*eggs|potatoes.*skin.*with salt|skin only.*with salt|sprouted, cooked|sprouted,.*cooked|smoked and canned.*alaska native|chinook.*smoked.*canned|separable fat|subcutaneous fat|intermuscular fat|cured.*separable fat|external fat only|separable fat.*raw|fat.*raw.*alaska|smoked.*brined|giblets.*raw|pork.*tail|variety meats.*tail|variety meats.*feet|variety meats.*ear|variety meats.*snout|variety meats.*chitterling|variety meats.*intestine|variety meats.*tripe|egg.*substitute.*powder|egg, yolk.*raw|yolk.*raw.*fresh|giblets.*fried|giblets.*cooked|chicken.*skin.*added sol|chicken.*skin.*drumstick|smoked.*canned.*alaska native"
         df = df[~df["description"].fillna("").str.lower().str.contains(_block_desc, regex=True, na=False)]
 
         # No-pork filter applied at pool level (catches fallback path too)

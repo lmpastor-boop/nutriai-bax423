@@ -292,8 +292,12 @@ def sidebar_profile() -> UserProfile:
     sex  = col2.selectbox("Sex", ["male", "female"])
 
     col3, col4 = st.sidebar.columns(2)
-    weight = col3.number_input("Weight (kg)", 30.0, 200.0, 70.0, step=0.5)
-    height = col4.number_input("Height (cm)", 100.0, 220.0, 170.0, step=0.5)
+    weight_lbs = col3.number_input("Weight (lbs)", 66.0, 440.0, 154.0, step=1.0)
+    weight = round(weight_lbs * 0.453592, 1)
+    ht_col1, ht_col2 = st.sidebar.columns(2)
+    height_ft = ht_col1.number_input("Height (ft)", 3, 8, 5, step=1)
+    height_in = ht_col2.number_input("Height (in)", 0, 11, 10, step=1)
+    height = round(((height_ft * 12) + height_in) * 2.54, 1)
 
     # BMR-based calorie suggestion (Mifflin-St Jeor)
     if sex == "male":
@@ -322,8 +326,9 @@ def sidebar_profile() -> UserProfile:
 
     allergen_options = list(ALLERGEN_KEYWORDS.keys())
     allergens = st.sidebar.multiselect(
-        "Allergens / Intolerances",
+        "Allergens / Intolerances (optional)",
         options=allergen_options,
+        default=[],
         format_func=lambda x: x.replace("_", " ").title()
     )
 
@@ -332,8 +337,9 @@ def sidebar_profile() -> UserProfile:
 
     condition_options = list(CONDITION_LABELS.keys())
     conditions = st.sidebar.multiselect(
-        "Select all that apply",
+        "Clinical Conditions (optional)",
         options=condition_options,
+        default=[],
         format_func=lambda x: CONDITION_LABELS[x]
     )
 
