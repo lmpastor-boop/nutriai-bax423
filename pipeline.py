@@ -1581,17 +1581,23 @@ class NutriAIPipeline:
         # Strategy: check every day individually; for any day below threshold,
         # inject a K-rich food into the lowest-calorie slot on that day.
         # No calorie-floor check — the other slots carry calorie adequacy.
+        k_injected_names: set = set()  # track K-injected slots to protect from sodium cap
         if "hypertension" in profile.conditions:
             k_rda = profile.rda().get("potassium_mg", 3500)
             k_threshold = k_rda * 0.80
 
             # Build sorted K-rich candidate list (descending potassium_mg)
             K_RICH = ["sweet potato", "spinach", "broccoli", "white bean",
-                      "lentil", "avocado", "banana", "potato,",
+                      "lentil", "avocado", "banana", "potato",
                       "salmon", "halibut", "tuna", "kidney bean",
-                      "edamame", "lima bean", "pinto",
-                      "acorn squash", "butternut", "beet", "chard",
-                      "soybeans"]
+                      "lima bean", "pinto", "acorn squash",
+                      "butternut", "beet", "chard", "swiss chard",
+                      "kale", "dried apricot", "prune", "raisin",
+                      "black bean", "navy bean", "great northern",
+                      "mackerel", "sardine", "trout", "cod",
+                      "yogurt", "clam", "oyster", "mussel",
+                      "artichoke", "brussels sprout", "pumpkin",
+                      "sunflower seed", "flaxseed", "hemp seed"]
             k_candidates = []
             for _, row in safe_pool.iterrows():
                 desc = (row.get("description", "") or "").lower()
@@ -1607,13 +1613,15 @@ class NutriAIPipeline:
                 if k_val < 200:
                     continue
                 k_candidates.append(row)
-                if len(k_candidates) >= 30:
+                if len(k_candidates) >= 60:
                     break
             k_candidates.sort(key=lambda r: r.get("potassium_mg") or 0, reverse=True)
 
             if k_candidates:
                 analysis = self.analyse(plan)
-                for day in range(1, 8):
+                # Process days worst-first so the lowest-K day gets first pick of candidates
+                days_by_k = sorted(range(1, 8), key=lambda d: analysis["days"][d]["totals"].get("potassium_mg", 0))
+                for day in days_by_k:
                     day_k = analysis["days"][day]["totals"].get("potassium_mg", 0)
                     if day_k >= k_threshold:
                         continue  # already adequate
@@ -1633,22 +1641,39 @@ class NutriAIPipeline:
                     day_slots_sorted = sorted(
                         [s for s in plan.slots if s.day == day
                          and not any(k in s.name.lower() for k in _FISH_KW2)],
-                        key=lambda s: s.scaled("calories")
+                        key=lambda s: s.nutrients.get("potassium_mg", 0) or 0
                     )
                     if not day_slots_sorted:
                         day_slots_sorted = sorted(
                             [s for s in plan.slots if s.day == day],
-                            key=lambda s: s.scaled("calories")
+                            key=lambda s: s.nutrients.get("potassium_mg", 0) or 0
                         )
                     if not day_slots_sorted:
                         continue
-                    slot = day_slots_sorted[0]  # lowest-calorie slot
+                    slot = day_slots_sorted[0]  # lowest-K slot
 
-                    # Find the best K-rich candidate not already on this day
+                    # Find the best K-rich candidate not already this week or day
                     week_names = {s.name for s in plan.slots}
-                    for k_row in k_candidates:
+                    # Fallback: query safe_pool directly for any high-K food not in week
+                    extended_candidates = list(k_candidates)
+                    for _, _kr in safe_pool.iterrows():
+                        _kv = _kr.get("potassium_mg") or 0
+                        if _kv < 300:
+                            continue
+                        _ke, _ = self._is_meal_eligible(_kr)
+                        if not _ke:
+                            continue
+                        _ko, _ = self._passes_clinical(_kr, profile)
+                        if not _ko:
+                            continue
+                        if _kr.get("description","") not in {r.get("description","") for r in extended_candidates}:
+                            extended_candidates.append(_kr)
+                    extended_candidates.sort(key=lambda r: r.get("potassium_mg") or 0, reverse=True)
+                    for k_row in extended_candidates:
                         k_name = k_row.get("description", "")
                         if k_name in week_names:
+                            continue
+                        if k_name in day_names:
                             continue
                         # Size the serving to roughly match the slot being replaced
                         cals = k_row.get("calories") or 100
@@ -1658,6 +1683,7 @@ class NutriAIPipeline:
                         na_per_serving = (k_row.get("sodium_mg") or 0) * serving_g / 100
                         if na_per_serving > 400:
                             continue
+                        k_injected_names.add(k_name)
                         slot.name = k_name
                         slot.fdc_id = int(k_row["fdc_id"])
                         slot.category = k_row.get("food_category", "") or ""
@@ -1668,6 +1694,74 @@ class NutriAIPipeline:
                         analysis = self.analyse(plan)
                         break
 
+        # Potassium fallback — direct DB query for any remaining low-K days
+        if "hypertension" in profile.conditions:
+            _k_rda2 = profile.rda().get("potassium_mg", 3500)
+            _k_thresh2 = _k_rda2 * 0.80
+            _analysis2 = self.analyse(plan)
+            _week_names2 = {s.name for s in plan.slots}
+            for _day2 in range(1, 8):
+                _day_k2 = _analysis2["days"][_day2]["totals"].get("potassium_mg", 0)
+                if _day_k2 >= _k_thresh2:
+                    continue
+                # Find lowest-K non-fish slot
+                _FISH3 = ["salmon","tuna","cod","tilapia","halibut","trout","sardine",
+                          "mackerel","bass","herring","catfish","shark","eel","shad",
+                          "scup","pompano","yellowtail","lingcod","seatrout","cobia"]
+                _day_slots2 = sorted(
+                    [s for s in plan.slots if s.day == _day2
+                     and not any(f in s.name.lower() for f in _FISH3)],
+                    key=lambda s: s.nutrients.get("potassium_mg", 0) or 0
+                )
+                if not _day_slots2:
+                    _day_slots2 = sorted(
+                        [s for s in plan.slots if s.day == _day2],
+                        key=lambda s: s.nutrients.get("potassium_mg", 0) or 0
+                    )
+                if not _day_slots2:
+                    continue
+                _target_slot2 = _day_slots2[0]
+                _day_names2 = {s.name for s in plan.slots if s.day == _day2}
+                # Direct scan of entire eligible pool for highest-K food not in week
+                _best_k_row = None
+                _best_k_val = 0
+                _bf_fallback = self._build_exclusion_bloom(profile)
+                for _, _row2 in self._df_with_calories.iterrows():
+                    _desc2 = _row2.get("description", "") or ""
+                    if _desc2 in _week_names2 or _desc2 in _day_names2:
+                        continue
+                    _kv2 = _row2.get("potassium_mg") or 0
+                    if _kv2 <= _best_k_val:
+                        continue
+                    _el2, _ = self._is_meal_eligible(_row2)
+                    if not _el2:
+                        continue
+                    _ok2, _ = self._passes_clinical(_row2, profile)
+                    if not _ok2:
+                        continue
+                    _combined2 = (_desc2 + " " + (_row2.get("ingredients_text","") or "")).lower()
+                    if self._text_hits_bloom(_combined2, _bf_fallback):
+                        continue
+                    _cals2 = _row2.get("calories") or 100
+                    _srv2 = min(400, max(80, (_target_slot2.scaled("calories") / _cals2) * 100))
+                    _na2 = (_row2.get("sodium_mg") or 0) * _srv2 / 100
+                    if _na2 > 600:
+                        continue
+                    # Only update best if this candidate fully passes all checks
+                    if _kv2 > _best_k_val:
+                        _best_k_row = _row2
+                        _best_k_val = _kv2
+                if _best_k_row is not None:
+                    _cals2 = _best_k_row.get("calories") or 100
+                    _srv2 = min(400, max(80, (_target_slot2.scaled("calories") / _cals2) * 100))
+                    _target_slot2.name = _best_k_row.get("description", "")
+                    _target_slot2.fdc_id = int(_best_k_row["fdc_id"])
+                    _target_slot2.category = _best_k_row.get("food_category", "") or ""
+                    _target_slot2.nutrients = {k: _best_k_row.get(k) for k in profile.rda().keys() if k in _best_k_row.index}
+                    _target_slot2.serving_g = round(_srv2, 1)
+                    _week_names2 = {s.name for s in plan.slots}
+                    _analysis2 = self.analyse(plan)
+
         # General sodium soft cap — applies to ALL profiles (not just hypertension)
         # Replaces worst offender slot on any day exceeding 2500mg
         _na_limit = 1500 if "hypertension" in profile.conditions else 2500
@@ -1676,8 +1770,10 @@ class NutriAIPipeline:
             _day_na = _analysis_na["days"][_day]["totals"].get("sodium_mg", 0)
             if _day_na <= _na_limit:
                 continue
-            # Find highest-sodium slot
-            _day_slots = [s for s in plan.slots if s.day == _day]
+            # Find highest-sodium slot (skip K-injected slots)
+            _day_slots = [s for s in plan.slots if s.day == _day and s.name not in k_injected_names]
+            if not _day_slots:
+                continue
             _worst = max(_day_slots, key=lambda s: s.scaled("sodium_mg"))
             # Find a lower-sodium replacement from safe_pool
             for _, _row in safe_pool.iterrows():
@@ -1693,6 +1789,14 @@ class NutriAIPipeline:
                 _na = (_row.get("sodium_mg") or 0)
                 if _na > 300:  # skip high-sodium replacements
                     continue
+                # Don't replace a slot if doing so would drop the day below potassium threshold
+                if "hypertension" in profile.conditions:
+                    _k_rda = profile.rda().get("potassium_mg", 3500)
+                    _k_threshold = _k_rda * 0.80
+                    _day_k = _analysis_na["days"][_day]["totals"].get("potassium_mg", 0)
+                    _slot_k = _worst.scaled("potassium_mg") or 0
+                    if (_day_k - _slot_k) < _k_threshold:
+                        continue  # skip — replacing this slot would break potassium
                 _cals = _row.get("calories") or 100
                 _target = _worst.scaled("calories")
                 _srv = min(400, max(80, (_target / _cals) * 100))

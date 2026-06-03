@@ -65,7 +65,7 @@ NUTRIENT_MAP = {
 }
 
 # Food data types with best nutrient coverage
-DATA_TYPES = ["Foundation", "SR Legacy"]
+DATA_TYPES = ["Foundation", "SR Legacy", "Survey (FNDDS)"]
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 CREATE_TABLE = """
@@ -120,6 +120,35 @@ def fetch_page(session: requests.Session, api_key: str, data_type: str,
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def backfill_nutrients(session: requests.Session, api_key: str, fdc_ids: list) -> dict:
+    """Fetch full nutrient data for a batch of fdc_ids via POST /foods endpoint.
+    Returns dict of {fdc_id: nutrients_dict}."""
+    result = {}
+    batch_size = 20
+    for i in range(0, len(fdc_ids), batch_size):
+        batch = fdc_ids[i:i+batch_size]
+        try:
+            resp = session.post(
+                f"{BASE_URL}/foods",
+                params={"api_key": api_key},
+                json={"fdcIds": batch, "format": "full"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            for food in resp.json():
+                fid = food.get("fdcId")
+                nutrients = {}
+                for n in food.get("foodNutrients", []):
+                    nid = n.get("nutrient", {}).get("id")
+                    if nid in NUTRIENT_MAP:
+                        nutrients[NUTRIENT_MAP[nid]] = n.get("amount")
+                result[fid] = nutrients
+        except Exception as e:
+            log.warning(f"Backfill failed for batch {i}: {e}")
+        time.sleep(0.15)
+    return result
 
 
 def parse_nutrients(food_nutrients: list) -> dict:
@@ -200,6 +229,18 @@ def fetch_all_foods(api_key: str, max_items: int) -> list[dict]:
                     break  # last page
                 page += 1
                 time.sleep(0.1)  # be polite to the API
+
+    # Backfill nutrients for foods missing calorie data (Foundation + FNDDS)
+    missing = [f for f in all_foods if not f.get("calories")]
+    if missing:
+        log.info(f"Backfilling nutrients for {len(missing):,} foods missing calorie data...")
+        fdc_ids = [f["fdc_id"] for f in missing if f.get("fdc_id")]
+        nutrient_map = backfill_nutrients(session, api_key, fdc_ids)
+        for food in all_foods:
+            if not food.get("calories") and food.get("fdc_id") in nutrient_map:
+                food.update(nutrient_map[food["fdc_id"]])
+        filled = sum(1 for f in all_foods if f.get("calories"))
+        log.info(f"After backfill: {filled:,}/{len(all_foods):,} foods have calorie data")
 
     log.info(f"Fetched {len(all_foods):,} unique foods total.")
     return all_foods
