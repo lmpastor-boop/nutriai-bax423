@@ -145,6 +145,15 @@ ALLERGEN_KEYWORDS = {
 }
 
 # Diet type: which food categories / keywords to exclude
+RELIGIOUS_EXCLUSIONS: dict[str, list[str]] = {
+    "halal": ["pork", "lard", "bacon", "ham", "prosciutto", "salami", "pepperoni",
+              "gelatin", "alcohol", "wine", "beer", "liquor", "rum", "brandy"],
+    "kosher": ["pork", "lard", "bacon", "ham", "shrimp", "lobster", "crab",
+               "clam", "oyster", "mussel", "scallop", "squid", "octopus"],
+    "hindu":  ["beef", "veal", "bison", "buffalo", "bull"],
+    "none":   [],
+}
+
 DIET_EXCLUSIONS = {
     "vegan": [
         # dairy
@@ -238,6 +247,7 @@ class UserProfile:
     allergens:   list[str]  = field(default_factory=list)   # keys from ALLERGEN_KEYWORDS
     conditions:  list[str]  = field(default_factory=list)   # ibs | gerd | diabetes | hypertension
     no_pork:     bool       = False
+    religious_constraint: str = "none"  # none | halal | kosher | hindu
 
     def rda(self) -> dict:
         """Return sex/age-adjusted RDA targets."""
@@ -861,6 +871,9 @@ class NutriAIPipeline:
             df = df[~df["_text"].str.contains(pork_pat, regex=True, na=False)]
 
         # Allergen exclusions (all diets)
+        # Religious constraint exclusions
+        for kw in RELIGIOUS_EXCLUSIONS.get(getattr(profile, "religious_constraint", "none"), []):
+            bloom.add(kw)
         for allergen in profile.allergens:
             kws = ALLERGEN_KEYWORDS.get(allergen, [allergen])
             pat = "|".join(re.escape(k) for k in kws)
@@ -1016,6 +1029,7 @@ class NutriAIPipeline:
         for allergen in profile.allergens:
             all_kws.update(ALLERGEN_KEYWORDS.get(allergen, []))
         all_kws.update(DIET_EXCLUSIONS.get(profile.diet_type, []))
+        all_kws.update(RELIGIOUS_EXCLUSIONS.get(getattr(profile, "religious_constraint", "none"), []))
 
         sample = self.df["description"].dropna().sample(
             min(n_samples, len(self.df)), random_state=42

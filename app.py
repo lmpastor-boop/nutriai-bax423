@@ -332,6 +332,17 @@ def sidebar_profile() -> UserProfile:
         format_func=lambda x: x.replace("_", " ").title()
     )
 
+    religious_constraint = st.sidebar.selectbox(
+        "Religious / cultural constraint",
+        ["none", "halal", "kosher", "hindu"],
+        format_func=lambda x: {
+            "none": "None",
+            "halal": "Halal (no pork, no alcohol)",
+            "kosher": "Kosher (no pork, no shellfish)",
+            "hindu": "Hindu (no beef)",
+        }[x]
+    )
+
     st.sidebar.markdown("---")
     st.sidebar.markdown("## 🥩 Food Preferences")
     PROTEIN_EXCLUSIONS = {
@@ -376,6 +387,7 @@ def sidebar_profile() -> UserProfile:
         allergens=allergens + extra_exclusions,
         conditions=conditions,
         no_pork=no_pork,
+        religious_constraint=religious_constraint,
     )
 
 
@@ -684,6 +696,9 @@ def main():
         pills.append(f'<span class="pill pill-green">{profile.diet_type.replace("-"," ").title()}</span>')
         for c in profile.conditions:
             pills.append(f'<span class="pill pill-blue">{CONDITION_LABELS[c]}</span>')
+        if profile.religious_constraint != "none":
+            rc_labels = {"halal": "Halal", "kosher": "Kosher", "hindu": "Hindu (no beef)"}
+            pills.append(f'<span class="pill pill-green">{rc_labels.get(profile.religious_constraint, "")}</span>')
         for a in profile.allergens:
             pills.append(f'<span class="pill pill-red">No {a.replace("_"," ").title()}</span>')
         st.markdown(" ".join(pills), unsafe_allow_html=True)
