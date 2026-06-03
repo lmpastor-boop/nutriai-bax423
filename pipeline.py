@@ -248,6 +248,7 @@ class UserProfile:
     conditions:  list[str]  = field(default_factory=list)   # ibs | gerd | diabetes | hypertension
     no_pork:     bool       = False
     religious_constraint: str = "none"  # none | halal | kosher | hindu
+    meal_diet_overrides: dict = field(default_factory=dict)  # e.g. {"Breakfast": "vegan", "Dinner": "non-vegetarian"}
 
     def rda(self) -> dict:
         """Return sex/age-adjusted RDA targets."""
@@ -1028,7 +1029,9 @@ class NutriAIPipeline:
         all_kws = set()
         for allergen in profile.allergens:
             all_kws.update(ALLERGEN_KEYWORDS.get(allergen, []))
-        all_kws.update(DIET_EXCLUSIONS.get(profile.diet_type, []))
+        _all_diets2 = set([profile.diet_type] + list(profile.meal_diet_overrides.values()))
+        for _d2 in _all_diets2:
+            all_kws.update(DIET_EXCLUSIONS.get(_d2, []))
         all_kws.update(RELIGIOUS_EXCLUSIONS.get(getattr(profile, "religious_constraint", "none"), []))
 
         sample = self.df["description"].dropna().sample(
@@ -1297,7 +1300,8 @@ class NutriAIPipeline:
 
                 # FAISS query: macro-steered semantic retrieval
                 # Bias hints are diet-aware — no dairy/meat hints for vegan/vegetarian
-                if profile.diet_type in ("vegan", "vegetarian"):
+                _slot_diet = profile.meal_diet_overrides.get(meal_label, profile.diet_type)
+                if _slot_diet in ("vegan", "vegetarian"):
                     # FIX Bug 5: bias toward iron-rich foods for IBS+female profiles
                     iron_hint = " iron-rich" if (
                         "ibs" in profile.conditions or profile.sex == "female"
@@ -1335,7 +1339,8 @@ class NutriAIPipeline:
                 macro_hint = bias_cycle[day % len(bias_cycle)]
                 categories = MEAL_CATEGORIES.get(meal_label, [])
                 cat_hint   = categories[day % len(categories)] if categories else ""
-                query      = f"{meal_label.lower()} {macro_hint} {profile.diet_type} healthy"
+                _meal_diet = profile.meal_diet_overrides.get(meal_label, profile.diet_type)
+                query      = f"{meal_label.lower()} {macro_hint} {_meal_diet} healthy"
                 if "ibs" in profile.conditions:
                     query += " low-FODMAP"
                 if "diabetes" in profile.conditions:

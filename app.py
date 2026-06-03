@@ -324,6 +324,17 @@ def sidebar_profile() -> UserProfile:
     if diet_type in ["non-vegetarian", "pescatarian"]:
         no_pork = st.sidebar.checkbox("No pork / halal preference")
 
+    with st.sidebar.expander("🏠 Mixed household (optional)"):
+        st.caption("Override diet type per meal slot")
+        diet_options = ["(same as main)", "vegan", "vegetarian", "pescatarian", "non-vegetarian"]
+        b_diet = st.selectbox("Breakfast diet", diet_options, key="b_diet")
+        l_diet = st.selectbox("Lunch diet",     diet_options, key="l_diet")
+        d_diet = st.selectbox("Dinner diet",    diet_options, key="d_diet")
+        meal_diet_overrides = {}
+        if b_diet != "(same as main)": meal_diet_overrides["Breakfast"] = b_diet
+        if l_diet != "(same as main)": meal_diet_overrides["Lunch"]     = l_diet
+        if d_diet != "(same as main)": meal_diet_overrides["Dinner"]    = d_diet
+
     allergen_options = list(ALLERGEN_KEYWORDS.keys())
     allergens = st.sidebar.multiselect(
         "Allergens / Intolerances (optional)",
@@ -388,6 +399,7 @@ def sidebar_profile() -> UserProfile:
         conditions=conditions,
         no_pork=no_pork,
         religious_constraint=religious_constraint,
+        meal_diet_overrides=meal_diet_overrides,
     )
 
 
