@@ -93,6 +93,7 @@ RDA_BASE = {
 # ── Clinical condition rules ───────────────────────────────────────────────────
 
 # High-FODMAP ingredients to flag for IBS
+# Source: Monash University Low-FODMAP Diet guidelines (https://www.monashfodmap.com)
 # Kept tight to avoid over-exclusion — only items strongly associated with FODMAP issues
 HIGH_FODMAP_KEYWORDS = [
     "garlic", "garlic powder", "onion", "onion powder", "onion flakes",
