@@ -1286,6 +1286,28 @@ class NutriAIPipeline:
         # the Bloom filter above remains the BAX-423 benchmarked technique.
         safe_pool = self._build_safe_pool(profile)
         safe_fdc_ids = set(safe_pool["fdc_id"].tolist())
+        # Per-meal safe pools for mixed household support
+        _meal_pools: dict[str, pd.DataFrame] = {}
+        if profile.meal_diet_overrides:
+            for _ml, _ml_diet in profile.meal_diet_overrides.items():
+                if _ml_diet != profile.diet_type:
+                    _tmp_profile = UserProfile(
+                        name=profile.name, age=profile.age, sex=profile.sex,
+                        weight_kg=profile.weight_kg, height_cm=profile.height_cm,
+                        calorie_target=profile.calorie_target,
+                        diet_type=_ml_diet,
+                        allergens=profile.allergens,
+                        conditions=profile.conditions,
+                        no_pork=profile.no_pork,
+                        religious_constraint=profile.religious_constraint,
+                    )
+                    _meal_pools[_ml] = self._build_safe_pool(_tmp_profile)
+
+        # Precompute per-meal fdc_id sets for O(1) lookup
+        _meal_pool_ids: dict[str, set] = {
+            ml: set(_meal_pools[ml]["fdc_id"].tolist())
+            for ml in _meal_pools
+        }
 
         used_names: set[str] = set()
         used_cats_per_day: dict[int, set[str]] = {d: set() for d in range(1, 8)}
@@ -1359,7 +1381,8 @@ class NutriAIPipeline:
                 selected = None
                 for _, row in candidates.iterrows():
                     # Safe pool gate — fastest rejection before any other check
-                    if int(row["fdc_id"]) not in safe_fdc_ids:
+                    _gate_ids = _meal_pool_ids.get(meal_label, safe_fdc_ids)
+                    if int(row["fdc_id"]) not in _gate_ids:
                         continue
 
                     desc = row.get("description", "") or ""
