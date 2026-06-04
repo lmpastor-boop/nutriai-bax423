@@ -1477,7 +1477,8 @@ class NutriAIPipeline:
 
                 if selected is None:
                     # Fallback: draw from pre-filtered safe pool only
-                    for _, row in safe_pool.sample(frac=1, random_state=day*10+ord(meal_label[0])).iterrows():
+                    _fb_pool = _meal_pools.get(meal_label, safe_pool)
+                    for _, row in _fb_pool.sample(frac=1, random_state=day*10+ord(meal_label[0])).iterrows():
                         desc = row.get("description", "") or ""
                         if desc in used_names:
                             continue
