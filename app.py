@@ -238,13 +238,20 @@ def generate_pdf(plan: MealPlan, analysis: dict) -> bytes:
             pdf.set_font("Helvetica", "B", 10)
             pdf.cell(20, 6, f"  {icon}", ln=False)
             pdf.set_font("Helvetica", "", 10)
-            cal = slot.scaled("calories")
-            prot = slot.scaled("protein_g")
-            pdf.cell(0, 6,
-                     f"{sanitize(slot.name[:55])}  "
-                     f"({slot.serving_g:.0f}g)  -  "
-                     f"{cal:.0f} kcal  |  {prot:.1f}g protein",
+            cal   = slot.scaled("calories")
+            prot  = slot.scaled("protein_g")
+            carbs = slot.scaled("carbs_g")
+            fat   = slot.scaled("fat_g")
+            fibre = slot.scaled("fiber_g")
+            pdf.cell(0, 5,
+                     f"{sanitize(slot.name[:55])}  ({slot.serving_g:.0f}g)",
                      ln=True)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.cell(0, 5,
+                     f"    {cal:.0f} kcal  |  Protein: {prot:.1f}g  |  "
+                     f"Carbs: {carbs:.1f}g  |  Fat: {fat:.1f}g  |  Fibre: {fibre:.1f}g",
+                     ln=True)
+            pdf.set_font("Helvetica", "", 10)
 
         # Day totals
         day_analysis = analysis["days"].get(day, {})
@@ -255,6 +262,8 @@ def generate_pdf(plan: MealPlan, analysis: dict) -> bytes:
                  f"    Day totals: "
                  f"{totals.get('calories',0):.0f} kcal  |  "
                  f"{totals.get('protein_g',0):.1f}g protein  |  "
+                 f"{totals.get('carbs_g',0):.1f}g carbs  |  "
+                 f"{totals.get('fat_g',0):.1f}g fat  |  "
                  f"{totals.get('fiber_g',0):.1f}g fibre  |  "
                  f"{totals.get('sodium_mg',0):.0f}mg sodium",
                  ln=True)
@@ -440,7 +449,8 @@ def render_plan_tab(plan: MealPlan, analysis: dict):
             {cal:.0f} kcal &nbsp;|&nbsp;
             Protein: {prot:.1f}g &nbsp;|&nbsp;
             Carbs: {carbs:.1f}g &nbsp;|&nbsp;
-            Fat: {fat:.1f}g{gi_badge}
+            Fat: {fat:.1f}g &nbsp;|&nbsp;
+            Fibre: {fibre:.1f}g{gi_badge}
           </div>
         </div>
         """, unsafe_allow_html=True)
