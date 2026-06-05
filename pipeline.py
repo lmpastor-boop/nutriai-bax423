@@ -207,6 +207,10 @@ INELIGIBLE_FOOD_KEYWORDS = [
     "oil, ", " oil", "shortening", "lard", "tallow", "margarine",
     "cooking spray", "vinegar", "salt, ", "baking powder", "baking soda",
     "food starch", "gelatin, dry", "yeast, ",
+    # Beverages and drink powders — not meals
+    "tea, ", "tea,", "coffee, ", "coffee,", "cocoa, ", "cocoa,",
+    "beverage", "drink mix", "instant powder", "powder, instant",
+    "kool-aid", "lemonade", "fruit punch", "sports drink", "energy drink",
     # Raw meat/fish/poultry — not safe or realistic as served meals
     # Exceptions: raw produce, raw eggs (allowed), raw fish for pescatarian (handled separately)
 ]
