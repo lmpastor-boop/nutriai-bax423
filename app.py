@@ -435,6 +435,7 @@ def render_plan_tab(plan: MealPlan, analysis: dict):
         prot  = slot.scaled("protein_g")
         carbs = slot.scaled("carbs_g")
         fat   = slot.scaled("fat_g")
+        fibre = slot.scaled("fiber_g")
         # GI label for diabetes profiles
         gi_badge = ""
         if "diabetes" in plan.profile.conditions:
