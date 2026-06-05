@@ -13,7 +13,7 @@ pip install -r requirements.txt
 
 # 2. Pull USDA food data (one-time, ~5 min)
 #    Get a free API key at https://fdc.nal.usda.gov/api-guide.html
-python fetch_usda_data.py --api-key YOUR_KEY_HERE --max-items 8000
+python fetch_usda_data.py --api-key YOUR_KEY_HERE --max-items 12000
 
 # 3. Run the app
 streamlit run app.py
