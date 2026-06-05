@@ -211,6 +211,10 @@ INELIGIBLE_FOOD_KEYWORDS = [
     "tea, ", "tea,", "coffee, ", "coffee,", "cocoa, ", "cocoa,",
     "beverage", "drink mix", "instant powder", "powder, instant",
     "kool-aid", "lemonade", "fruit punch", "sports drink", "energy drink",
+    # Spices, herbs, condiments — not meals
+    "spices, ", "spice,", "herbs, ", "herb,", "chervil", "paprika",
+    "cumin", "turmeric", "oregano", "thyme", "basil, dried",
+    "external fat", "separable fat",
     # Raw meat/fish/poultry — not safe or realistic as served meals
     # Exceptions: raw produce, raw eggs (allowed), raw fish for pescatarian (handled separately)
 ]
