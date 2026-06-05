@@ -426,6 +426,11 @@ def render_plan_tab(plan: MealPlan, analysis: dict):
         prot  = slot.scaled("protein_g")
         carbs = slot.scaled("carbs_g")
         fat   = slot.scaled("fat_g")
+        # GI label for diabetes profiles
+        gi_badge = ""
+        if "diabetes" in plan.profile.conditions:
+            gi_badge = ' &nbsp;|&nbsp; <span style="color:#1a7a4a;font-weight:600">GI ≤ 55 ✓</span>'
+
         st.markdown(f"""
         <div class="meal-card">
           <div class="meal-label">{icon} {slot.meal}</div>
@@ -435,7 +440,7 @@ def render_plan_tab(plan: MealPlan, analysis: dict):
             {cal:.0f} kcal &nbsp;|&nbsp;
             Protein: {prot:.1f}g &nbsp;|&nbsp;
             Carbs: {carbs:.1f}g &nbsp;|&nbsp;
-            Fat: {fat:.1f}g
+            Fat: {fat:.1f}g{gi_badge}
           </div>
         </div>
         """, unsafe_allow_html=True)
