@@ -423,6 +423,13 @@ class NutriAIPipeline:
         self._bloom_cache: dict[str, BloomFilter] = {}
         self.benchmark: dict = {}
 
+    def _respects_meal_diet(self, desc: str, meal_label: str, profile: "UserProfile") -> bool:
+        """Return True if the food description is allowed for this meal slot's diet override."""
+        if meal_label not in profile.meal_diet_overrides:
+            return True
+        excl = DIET_EXCLUSIONS.get(profile.meal_diet_overrides[meal_label], [])
+        return not any(kw in desc.lower() for kw in excl)
+
     # ── Load ──────────────────────────────────────────────────────────────────
 
     def load(self, force_reindex: bool = False) -> None:
@@ -1404,6 +1411,12 @@ class NutriAIPipeline:
                         })
                         continue
 
+                    # Mixed household: per-slot diet keyword check
+                    if meal_label in profile.meal_diet_overrides:
+                        _slot_excl_kws = DIET_EXCLUSIONS.get(profile.meal_diet_overrides[meal_label], [])
+                        if any(kw in desc.lower() for kw in _slot_excl_kws):
+                            continue
+
                     # Clinical filter
                     ok, reason = self._passes_clinical(row, profile)
                     if not ok:
@@ -1482,6 +1495,11 @@ class NutriAIPipeline:
                         desc = row.get("description", "") or ""
                         if desc in used_names:
                             continue
+                        # Mixed household: per-slot diet keyword check in fallback
+                        if meal_label in profile.meal_diet_overrides:
+                            _fb_excl = DIET_EXCLUSIONS.get(profile.meal_diet_overrides[meal_label], [])
+                            if any(kw in desc.lower() for kw in _fb_excl):
+                                continue
                         eligible, _ = self._is_meal_eligible(row)
                         if not eligible:
                             continue
@@ -1559,6 +1577,8 @@ class NutriAIPipeline:
                         # Only swap if the iron food can deliver at least 60% of target calories
                         if (cals * serving_g / 100) < target_cal * 0.60:
                             continue
+                        if not self._respects_meal_diet(iron_name, slot.meal, profile):
+                            continue
                         slot.name = iron_name
                         slot.fdc_id = int(iron_row["fdc_id"])
                         slot.category = iron_row.get("food_category", "") or ""
@@ -1611,6 +1631,8 @@ class NutriAIPipeline:
                     cals = b12_row.get("calories") or 150
                     serving_g = min(350, max(80, (target_cal / cals) * 100))
                     if (cals * serving_g / 100) < target_cal * 0.60:
+                        continue
+                    if not self._respects_meal_diet(b12_name, slot.meal, profile):
                         continue
                     slot.name = b12_name
                     slot.fdc_id = int(b12_row["fdc_id"])
@@ -1727,6 +1749,8 @@ class NutriAIPipeline:
                         if na_per_serving > 400:
                             continue
                         k_injected_names.add(k_name)
+                        if not self._respects_meal_diet(k_name, slot.meal, profile):
+                            continue
                         slot.name = k_name
                         slot.fdc_id = int(k_row["fdc_id"])
                         slot.category = k_row.get("food_category", "") or ""
@@ -1831,6 +1855,9 @@ class NutriAIPipeline:
                     continue
                 _na = (_row.get("sodium_mg") or 0)
                 if _na > 300:  # skip high-sodium replacements
+                    continue
+                # Mixed household: respect meal diet override
+                if not self._respects_meal_diet(_desc, _worst.meal, profile):
                     continue
                 # Don't replace a slot if doing so would drop the day below potassium threshold
                 if "hypertension" in profile.conditions:
