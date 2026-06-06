@@ -552,9 +552,57 @@ def render_weekly_tab(plan: MealPlan, analysis: dict):
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
+
+# Allergens that carry meaningful cross-contamination risk in shared facilities
+_CROSS_CONTAMINATION_ALLERGENS = {
+    "gluten":     "Gluten (celiac) — strict cross-contamination risk: avoid shared fryers, "
+                  "cutting boards, or any facility that also processes wheat, barley, or rye.",
+    "tree_nuts":  "Tree nuts — cross-contamination risk in facilities that process mixed nuts. "
+                  "Look for 'may contain tree nuts' warnings on packaged foods.",
+    "peanuts":    "Peanuts — high cross-contamination risk in shared processing facilities. "
+                  "Check all packaged and restaurant foods carefully.",
+    "shellfish":  "Shellfish — cross-contamination risk in seafood processing environments "
+                  "and shared cooking surfaces.",
+    "dairy":      "Dairy — cross-contamination risk on shared equipment in bakeries and "
+                  "food manufacturing facilities.",
+    "eggs":       "Eggs — cross-contamination risk in baked goods and shared kitchen equipment.",
+    "soy":        "Soy — widely present as a hidden ingredient; cross-contamination risk "
+                  "in Asian cuisine kitchens and processed foods.",
+    "sesame":     "Sesame — cross-contamination risk in Middle Eastern and Asian cuisine "
+                  "kitchens; increasingly required on food labels.",
+}
+
+
 def render_exclusions_tab(plan: MealPlan):
     st.markdown('<div class="section-header">🚫 Why Foods Were Excluded</div>',
                 unsafe_allow_html=True)
+
+    # ── Cross-contamination warnings ─────────────────────────────────────────
+    active_allergens = [a for a in plan.profile.allergens
+                        if a in _CROSS_CONTAMINATION_ALLERGENS]
+    if active_allergens:
+        st.markdown(
+            '<div class="section-header" style="color:#C62828;border-color:#FFCDD2">'
+            '⚠️ Cross-Contamination Risks</div>',
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<small style='color:#666'>The following allergens in your profile carry "
+            "cross-contamination risks beyond ingredient-level exclusion. "
+            "NutriAI removes foods containing these allergens directly, but cannot "
+            "guarantee manufacturing or kitchen-level separation.</small>",
+            unsafe_allow_html=True
+        )
+        for allergen in active_allergens:
+            label, detail = _CROSS_CONTAMINATION_ALLERGENS[allergen].split(" — ", 1)
+            st.markdown(
+                f'<div class="excl-row">'
+                f'<b>⚠️ {label}</b><br>'
+                f'<span style="color:#C62828">{detail}</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        st.markdown("")
 
     if not plan.exclusions:
         st.info("No exclusions recorded for this profile.")
